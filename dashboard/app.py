@@ -389,15 +389,32 @@ def update_dataset_stats(tab):
     if df_original.empty:
         return html.Div("Data not available", className="error-message")
     
+    # Get survival rate more safely by checking actual values first
+    survival_rate = 0
+    if 'SurvivalStatus' in df_original.columns:
+        status_counts = df_original['SurvivalStatus'].value_counts()
+        
+        # Try to find positive survival value by checking common terms
+        survival_terms = ['Survived', 'survived', 'Alive', 'alive', 'Yes', 'yes', '1', 1, True]
+        
+        for term in survival_terms:
+            if term in status_counts:
+                survival_rate = status_counts[term] / len(df_original) * 100
+                break
+        
+        # If we couldn't find a match, just use the first value as a fallback
+        if survival_rate == 0 and not status_counts.empty:
+            survival_rate = status_counts.iloc[0] / len(df_original) * 100
+    
     return html.Div([
         html.Div([
-            html.Div("10,000", className="stat-value"),
+            html.Div(f"{len(df_original)}", className="stat-value"),
             html.Div("Patients", className="stat-label")
         ], className="stat-item"),
         
         html.Div([
-            html.Div(f"{df_original['Gender'].value_counts()['Male'] / len(df_original) * 100:.1f}%", className="stat-value"),
-            html.Div("Male", className="stat-label")
+            html.Div(f"{df_original['Gender'].value_counts().iloc[0] / len(df_original) * 100:.1f}%", className="stat-value"),
+            html.Div(f"{df_original['Gender'].value_counts().index[0]}", className="stat-label")
         ], className="stat-item"),
         
         html.Div([
@@ -406,7 +423,7 @@ def update_dataset_stats(tab):
         ], className="stat-item"),
         
         html.Div([
-            html.Div(f"{df_original['SurvivalStatus'].value_counts()['Survived'] / len(df_original) * 100:.1f}%", className="stat-value"),
+            html.Div(f"{survival_rate:.1f}%", className="stat-value"),
             html.Div("Survival Rate", className="stat-label")
         ], className="stat-item"),
     ])
@@ -437,13 +454,16 @@ def update_distribution_plot(feature):
         )
     else:
         # Bar chart for categorical features
+        # Buat DataFrame terlebih dahulu dan beri nama kolom yang eksplisit
+        value_counts_df = df_original[feature].value_counts().reset_index()
+        value_counts_df.columns = [feature, 'count']  # Nama kolom yang jelas
+        
         fig = px.bar(
-            df_original[feature].value_counts().reset_index(),
-            x="index",
-            y=feature,
+            value_counts_df,
+            x=feature,
+            y='count',
             title=f"Distribution of {feature}",
-            color_discrete_sequence=["#3366CC"],
-            labels={"index": feature, feature: "Count"}
+            color_discrete_sequence=["#3366CC"]
         )
         fig.update_layout(
             xaxis_title=feature,
@@ -640,7 +660,25 @@ def update_cluster_profile(cluster_id):
     # Calculate cluster statistics
     avg_age = df_original['Age'].loc[cluster_data.index].mean()
     avg_tumor_size = df_original['TumorSize'].loc[cluster_data.index].mean()
-    survival_rate = (df_original['SurvivalStatus'].loc[cluster_data.index] == 'Survived').mean() * 100
+    
+    # Find the positive survival value
+    survival_terms = ['Survived', 'survived', 'Alive', 'alive', 'Yes', 'yes', '1', 1, True]
+    survival_value = None
+    
+    for term in survival_terms:
+        if term in df_original['SurvivalStatus'].unique():
+            survival_value = term
+            break
+    
+    # If we couldn't find a match, just use the first value
+    if survival_value is None and len(df_original['SurvivalStatus'].unique()) > 0:
+        survival_value = df_original['SurvivalStatus'].unique()[0]
+    
+    # Calculate survival rate
+    if survival_value is not None:
+        survival_rate = (df_original['SurvivalStatus'].loc[cluster_data.index] == survival_value).mean() * 100
+    else:
+        survival_rate = 0
     
     # Get dominant tumor types
     tumor_counts = df_original['TumorType'].loc[cluster_data.index].value_counts()
@@ -663,9 +701,28 @@ def update_cluster_profile(cluster_id):
     if len(dominant_treatments) > 1:
         dominant_treatments_str += f", {dominant_treatments[1]} ({treatment_counts[dominant_treatments[1]] / len(cluster_data) * 100:.1f}%)"
     
-    # Metastasis rate
-    metastasis_rate = (df_original['Metastasis'].loc[cluster_data.index] == 'Yes').mean() * 100
+    # Metastasis rate - handle different possible values
+    metastasis_terms = ['Yes', 'yes', 'True', 'true', '1', 1, True]
+    metastasis_value = None
     
+    for term in metastasis_terms:
+        if term in df_original['Metastasis'].unique():
+            metastasis_value = term
+            break
+    
+    # If we couldn't find a match, just use the first value different from 'No'
+    if metastasis_value is None:
+        for val in df_original['Metastasis'].unique():
+            if val not in ['No', 'no', 'False', 'false', '0', 0, False]:
+                metastasis_value = val
+                break
+    
+    # Calculate metastasis rate
+    if metastasis_value is not None:
+        metastasis_rate = (df_original['Metastasis'].loc[cluster_data.index] == metastasis_value).mean() * 100
+    else:
+        metastasis_rate = 0
+
     return html.Div([
         html.H4(f"Cluster {cluster_id}: {cluster_names[cluster_id]}", className="cluster-name"),
         
