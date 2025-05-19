@@ -2,6 +2,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
+from sklearn.impute import SimpleImputer  # Import imputer untuk menangani missing values
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
@@ -14,9 +15,23 @@ df_prep = pd.read_csv('data/preprocessed_cancer_data.csv')
 features = ['Age', 'TumorSize', 'ChemotherapySessions', 'RadiationSessions', 'CancerStage_encoded', 
             'SmokingStatus_encoded', 'AlcoholUse_encoded', 'Gender_Male', 'Metastasis_Yes']
 
-# Standardize features
+# Cek missing values sebelum preprocessing
+print("Missing values in each feature:")
+print(df_prep[features].isnull().sum())
+
+# Ambil subset data yang berisi kolom-kolom yang diperlukan
+X_raw = df_prep[features].values
+
+# Impute missing values (ganti NaN dengan nilai mean)
+imputer = SimpleImputer(strategy='mean')
+X_imputed = imputer.fit_transform(X_raw)
+
+# Standardize features setelah imputasi
 scaler = StandardScaler()
-X = scaler.fit_transform(df_prep[features])
+X = scaler.fit_transform(X_imputed)
+
+# Cek apakah masih ada NaN values
+print("NaN values after imputation:", np.isnan(X).sum())
 
 # Determine optimal number of clusters using silhouette score
 silhouette_scores = []
@@ -37,7 +52,8 @@ plt.savefig('image/silhouette_score.png')
 
 # Implement K-means with optimal k=3
 kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
-df_prep['Cluster'] = kmeans.fit_predict(X)
+cluster_labels = kmeans.fit_predict(X)
+df_prep['Cluster'] = cluster_labels
 
 # Visualize clusters using PCA
 pca = PCA(n_components=2)
@@ -66,3 +82,8 @@ cluster_analysis = df_prep.groupby('Cluster').agg({
 })
 
 print(cluster_analysis)
+
+# Menyimpan model dan scaler untuk digunakan di dashboard
+import joblib
+joblib.dump(kmeans, 'model/kmeans_model.pkl')
+joblib.dump(scaler, 'model/scaler.pkl')
