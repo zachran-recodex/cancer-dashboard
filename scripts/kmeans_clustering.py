@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
+from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
@@ -32,7 +33,15 @@ def perform_kmeans_clustering(file_path):
         'Gender_Male', 'Metastasis_Yes', 'TumorType_encoded'
     ]
     
-    X = df[clustering_features].values
+    # Check for missing values
+    missing_values = df[clustering_features].isnull().sum()
+    print("\nMissing values in features:")
+    print(missing_values)
+    
+    # Handle missing values using SimpleImputer
+    print("Imputing missing values...")
+    imputer = SimpleImputer(strategy='mean')
+    X = imputer.fit_transform(df[clustering_features].values)
     
     # Determine optimal number of clusters using silhouette score
     print("Determining optimal number of clusters...")
