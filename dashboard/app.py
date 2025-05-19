@@ -1146,4 +1146,4 @@ def update_prediction(n_clicks, age, gender, tumor_type, cancer_stage, tumor_siz
 
 # Run the app
 if __name__ == '__main__':
-    app.run_server(debug=True, port=8050)
+    app.run(debug=True, port=8050)
