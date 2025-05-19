@@ -4,6 +4,7 @@ from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 from sklearn.metrics import confusion_matrix, classification_report, roc_curve
+from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
@@ -34,9 +35,27 @@ def build_logistic_regression_model(file_path):
         'TreatmentType_encoded', 'WaitingTimeDays', 'TreatmentComplexity_encoded'
     ]
     
-    # Define features and target
+    # Define features
     X = df[classification_features]
+    
+    # Create proper target variable from SurvivalStatus
+    print("\nCreating binary target variable from SurvivalStatus...")
+    df['SurvivalStatus_Survived'] = (df['SurvivalStatus'] == 'Alive').astype(int)
     y = df['SurvivalStatus_Survived']
+    
+    # Check target variable distribution
+    print("\nTarget variable distribution:")
+    print(y.value_counts())
+    
+    # Check for missing values in features
+    missing_values = X.isnull().sum()
+    print("\nMissing values in features:")
+    print(missing_values)
+    
+    # Handle missing values using SimpleImputer
+    print("Imputing missing values...")
+    imputer = SimpleImputer(strategy='mean')
+    X = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
     
     # Split the data into training and testing sets
     print("Splitting data into training and testing sets...")
